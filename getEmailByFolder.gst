@@ -26,17 +26,71 @@
 */ 
 
 function getEmailByLabel(docName, folderLabel) {
+  var emailMessages = [];
+  var sizeOfMsgArray;
+  var newEmailMessages = [];
+  
   // Create a collection of emails based on the label, retrieve the messages & create messagebidy array
-  var folderLabel = "basqueorbilogs";
   var threads = GmailApp.search("label:" + folderLabel);
   var messages = GmailApp.getMessagesForThreads(threads);
   messages.forEach(function(messages) {
     messages.forEach(function(d) {
-      emailMessages.push(d.getPlainBody());
+      sizeOfMsgArray = emailMessages.push(d.getPlainBody());
     });
   });
+  
+  // Store the bodies of the emails into a text file
+  DriveApp.createFile(docName, emailMessages);
 
-  // Store the bodies of the emails into the text file
-  // NB: This overwrites the file each time.
-  var logDocument = DriveApp.createFile(docName, emailMessages);
+  // Read in the text file, convert the contents to a string and then into an array of lines.  
+  // Then we de-duplicate the array of log messages.  This is needed as the Orbi
+  // tends to resend log messages.  This is a very simplistic de-duplicator and time consuming.  
+  // 
+  // NB: Would be great if I could figure out how to parse the message body into individual lines
+
+  // Open the fle and convert the contents into an array of lines.  There should only be one
+  // since we delete it after we clean up.
+
+  logFiles = DriveApp.getFilesByName(docName);
+  if (logFiles.hasNext() == false) {
+    Logger.log("No files found, exiting.");
+    return false;
+  };
+
+  countOfFiles = 0;
+  var thisFile;
+  var docContent;
+  while (logFiles.hasNext()) {
+    thisfile = logFiles.next();
+    countOfFiles = countOfFiles + 1;
+    docContent = thisfile.getBlob();
+  };
+
+  var docLines = [];
+  docString = docContent.getDataAsString();
+  docLines = docString.split(/\n/);
+  Logger.log("Before Count of docLines = " + docLines.length);
+  
+  // Sort the array and then de-duplicate it and then store it back
+  
+  docLines.sort();
+  var newDocLines = [];
+  var baseCompare =0;
+  var currentCompare = 0;
+  var nextCompare= 1;
+  while (baseCompare < docLines.length) {
+    if (docLines[currentCompare] == docLines[nextCompare]) {
+      nextCompare = nextCompare + 1;
+    } else {
+      newDocLines.push(docLines[baseCompare]);
+      baseCompare = nextCompare;
+      currentCompare = nextCompare;
+      nextCompare = nextCompare + 1;
+    }
+  }
+  
+  Logger.log("After Count of docLines = " + newDocLines.length);
+  
+  DriveApp.createFile(docName, newDocLines,"text/plain");
+  
 }
